@@ -24,7 +24,8 @@ class KillRandomLeader[T, P <: Position[P]](
       toBeKilled.foreach {
         killing =>
           println(s"[DEBUG] killing node ${killing.getId}")
-          environment.getSimulation.schedule(() => environment.removeNode(killing))
+          //environment.getSimulation.schedule(() => environment.removeNode(killing))
+          killing.setConcentration(new SimpleMolecule(Sensors.isDown), true.asInstanceOf[T])
       }
     }
   }

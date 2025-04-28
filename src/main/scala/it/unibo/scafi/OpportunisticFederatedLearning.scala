@@ -46,64 +46,68 @@ class OpportunisticFederatedLearning
 
   override def main(): Any = {
     rep((localModel, localModel, 1)) { case (local, global, tick) =>
-      val metric = actualMetric(local)
-      val leader = SWithMinimisingShare(
-        threshold,
-        metric = metric,
-        symBreaker = mid()
-      )
-      val isAggregator = leader == mid()
-      val (evolvedModel, trainLoss) = localTraining(local, trainData)
-      val (validationAccuracy, validationLoss) =
-        evalModel(evolvedModel, validationData)
-      val neighbourhoodMetric = excludingSelf.reifyField(metric())
-      val potential = classicGradient(isAggregator, metric)
-      // flexGradient(0.5, 0.9, 1)(isAggregator, metric)
-      val sender = G_along(potential, metric, mid(), (_: ID) => nbr(mid()))
-      val info = CWithSenderField[List[py.Dynamic]](
-        _ ++ _,
-        List(evolvedModel),
-        List.empty,
-        sender
-      )
-      val areaId = data.areaId
-      val aggregatedModel = averageWeights(info, List.fill(info.length)(1.0))
-      val sharedModel = broadcast(isAggregator, aggregatedModel, metric)
+      branch(!node.get(Sensors.isDown).asInstanceOf[Boolean]){
+        val metric = actualMetric(local)
+        val leader = SWithMinimisingShare(
+          threshold,
+          metric = metric,
+          symBreaker = mid()
+        )
+        val isAggregator = leader == mid()
+        val (evolvedModel, trainLoss) = localTraining(local, trainData)
+        val (validationAccuracy, validationLoss) =
+          evalModel(evolvedModel, validationData)
+        val neighbourhoodMetric = excludingSelf.reifyField(metric())
+        val potential = classicGradient(isAggregator, metric)
+        // flexGradient(0.5, 0.9, 1)(isAggregator, metric)
+        val sender = G_along(potential, metric, mid(), (_: ID) => nbr(mid()))
+        val info = CWithSenderField[List[py.Dynamic]](
+          _ ++ _,
+          List(evolvedModel),
+          List.empty,
+          sender
+        )
+        val areaId = data.areaId
+        val aggregatedModel = averageWeights(info, List.fill(info.length)(1.0))
+        val sharedModel = broadcast(isAggregator, aggregatedModel, metric)
 
-      if (isAggregator) { snapshot(sharedModel, mid(), tick) }
-      // Actuations
-      val (same, _) = rep((false, leader)) { case (same, oldId) =>
-        (oldId == leader) -> leader
-      }
-      node.put(Sensors.data, py"len(${data.trainingData})")
-      node.put(Sensors.sameLeader, same)
-      node.put(Sensors.leaderId, leader)
-      node.put(Sensors.model, sample(local))
-      node.put(Sensors.sharedModel, sample(sharedModel))
-      node.put("Federation", leader % 9)
-      node.put(Sensors.areaId, areaId)
-      if (isAggregator) { node.put(models, info) }
-      node.put(Sensors.potential, potential)
-      node.put(Sensors.modelsCount, info.length)
-      node.put(Sensors.neighbourhoodMetric, neighbourhoodMetric)
-      node.put(Sensors.isAggregator, isAggregator)
-      node.put(Sensors.trainLoss, trainLoss)
-      node.put(Sensors.validationLoss, validationLoss)
-      node.put(Sensors.validationAccuracy, validationAccuracy)
-      node.put(Sensors.parent, findParentWithMetric(potential, metric))
-      node.put(Sensors.sender, sender)
-      mux(impulsesEvery(tick)) {
-        (
-          averageWeights(List(evolvedModel, sharedModel), List(0.1, 0.9)),
-          averageWeights(List(evolvedModel, sharedModel), List(0.1, 0.9)),
-          tick + 1
-        )
-      } {
-        (
-          evolvedModel,
-          averageWeights(List(evolvedModel, sharedModel), List(0.9, 0.1)),
-          tick + 1
-        )
+        if (isAggregator) { snapshot(sharedModel, mid(), tick) }
+        // Actuations
+        val (same, _) = rep((false, leader)) { case (same, oldId) =>
+          (oldId == leader) -> leader
+        }
+        node.put(Sensors.data, py"len(${data.trainingData})")
+        node.put(Sensors.sameLeader, same)
+        node.put(Sensors.leaderId, leader)
+        node.put(Sensors.model, sample(local))
+        node.put(Sensors.sharedModel, sample(sharedModel))
+        node.put("Federation", leader % 9)
+        node.put(Sensors.areaId, areaId)
+        if (isAggregator) { node.put(models, info) }
+        node.put(Sensors.potential, potential)
+        node.put(Sensors.modelsCount, info.length)
+        node.put(Sensors.neighbourhoodMetric, neighbourhoodMetric)
+        node.put(Sensors.isAggregator, isAggregator)
+        node.put(Sensors.trainLoss, trainLoss)
+        node.put(Sensors.validationLoss, validationLoss)
+        node.put(Sensors.validationAccuracy, validationAccuracy)
+        node.put(Sensors.parent, findParentWithMetric(potential, metric))
+        node.put(Sensors.sender, sender)
+        mux(impulsesEvery(tick)) {
+          (
+            averageWeights(List(evolvedModel, sharedModel), List(0.1, 0.9)),
+            averageWeights(List(evolvedModel, sharedModel), List(0.1, 0.9)),
+            tick + 1
+          )
+        } {
+          (
+            evolvedModel,
+            averageWeights(List(evolvedModel, sharedModel), List(0.9, 0.1)),
+            tick + 1
+          )
+        }
+      }{
+        (local, global, tick) // If the node is down then do nothing
       }
     }
   }
