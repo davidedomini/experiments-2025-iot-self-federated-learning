@@ -9,7 +9,7 @@ variables:
     min: 0
     max: 9
     step: 1
-    default: 3
+    default: 0
   epochs: &epochs
     formula: 2
   aggregateLocalEvery: &aggregateLocalEvery
@@ -100,18 +100,20 @@ deployments:
         concentration: *aggregateLocalEvery
       - molecule: BatchSize
         concentration: *batchSize
+      - molecule: isDown
+        concentration: false
     programs: *gradient
 
 terminate:
   type: AfterTime
-  parameters: 40.0
+  parameters: 60.0
 
 export:
   - type: CSVExporter
     parameters:
       fileNameRoot: "experiment"
       interval: 1.0
-      exportPath: "data"
+      exportPath: "data-leader-kill"
     data:
       - time
       - type: AreaCountExporter
