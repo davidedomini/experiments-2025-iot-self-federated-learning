@@ -135,6 +135,10 @@ def cnn_loader(seed):
     model.load_state_dict(torch.load(f'networks/initial_model_seed_{seed}'))
     return model
 
+def empty_model():
+    model = CNNMnist()
+    return model
+
 def nn_from_weights(weights):
     model = CNNMnist()
     model.load_state_dict(weights)

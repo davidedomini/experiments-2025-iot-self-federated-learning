@@ -45,8 +45,8 @@ class OpportunisticFederatedLearning
   private lazy val threshold = sense[Double](lossThreshold)
 
   override def main(): Any = {
-    rep((localModel, localModel, 1)) { case (local, global, tick) =>
-      branch(!node.get(Sensors.isDown).asInstanceOf[Boolean]){
+    branch(!node.get(Sensors.isDown).asInstanceOf[Boolean]){
+      rep((localModel, localModel, 1)) { case (local, global, tick) =>
         val metric = actualMetric(local)
         val leader = SWithMinimisingShare(
           threshold,
@@ -106,9 +106,9 @@ class OpportunisticFederatedLearning
             tick + 1
           )
         }
-      }{
-        (local, global, tick) // If the node is down then do nothing
       }
+    }{
+      (emptyModel(), emptyModel(), 0) // If the node is down then do nothing
     }
   }
 
@@ -123,6 +123,10 @@ class OpportunisticFederatedLearning
     val freshNN = utils.cnn_loader(seed)
     freshNN.load_state_dict(newWeights)
     (freshNN, trainLoss)
+  }
+
+  private def emptyModel(): py.Dynamic = {
+    utils.empty_model()
   }
 
   private def discrepancyMetric(
