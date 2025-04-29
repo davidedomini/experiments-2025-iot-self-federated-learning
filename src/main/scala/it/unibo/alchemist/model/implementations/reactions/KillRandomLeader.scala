@@ -26,6 +26,7 @@ class KillRandomLeader[T, P <: Position[P]](
           println(s"[DEBUG] killing node ${killing.getId}")
           //environment.getSimulation.schedule(() => environment.removeNode(killing))
           killing.setConcentration(new SimpleMolecule(Sensors.isDown), true.asInstanceOf[T])
+          killing.removeConcentration(new SimpleMolecule(Sensors.isAggregator))
       }
     }
   }
